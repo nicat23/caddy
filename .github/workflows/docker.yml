@@ -43,6 +43,19 @@ jobs:
     #   BASHBREW_NAMESPACE: caddy
     steps:
       - uses: actions/checkout@master
+      - name: Start Docker service
+        run: |
+          $dockerService = Get-Service -Name docker -ErrorAction Stop
+          if ($dockerService.Status -ne 'Running') {
+            Start-Service -Name docker
+          }
+          $deadline = (Get-Date).AddMinutes(2)
+          do {
+            docker info
+            if ($LASTEXITCODE -eq 0) { exit 0 }
+            Start-Sleep -Seconds 5
+          } while ((Get-Date) -lt $deadline)
+          throw 'Docker daemon did not become ready within 2 minutes.'
       - name: non-master build test
         # the nanoserver image copies caddy.exe from the servercore image, which
         # isn't published yet when the version changes, so tag the local build
