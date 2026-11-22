@@ -1,49 +1,79 @@
-# Stage 1: Build patched Caddy binary on Wolfi
+# Stage 1: Build patched Caddy binary from source
 FROM cgr.dev/chainguard/wolfi-base:latest AS builder
 
 ENV CADDY_VERSION=v2.11.9
 
-RUN apk add --no-cache go git ca-certificates
+RUN apk add --no-cache \
+	ca-certificates \
+	git \
+	go
 
 WORKDIR /src
-RUN git clone --depth 1 --branch "${CADDY_VERSION}" https://github.com/caddyserver/caddy.git . && \
-    go get -u \
-        github.com/go-jose/go-jose/v3 \
-        github.com/klauspost/compress \
-        golang.org/x/net \
-        go.opentelemetry.io/otel \
-        go.opentelemetry.io/otel/sdk \
-        go.opentelemetry.io/otel/trace && \
-    go mod tidy && \
-    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /usr/bin/caddy ./cmd/caddy
 
-# Stage 2: Minimal Wolfi runtime image
+RUN set -eux; \
+	git clone --depth 1 --branch "${CADDY_VERSION}" https://github.com/caddyserver/caddy.git .; \
+	go get -u \
+		github.com/klauspost/compress \
+		golang.org/x/net \
+		go.opentelemetry.io/otel \
+		go.opentelemetry.io/otel/sdk \
+		go.opentelemetry.io/otel/sdk/log \
+		go.opentelemetry.io/otel/trace; \
+	go mod tidy; \
+	CGO_ENABLED=0 go build -trimpath \
+		-ldflags="-s -w -X github.com/caddyserver/caddy/v2.CustomVersion=${CADDY_VERSION}" \
+		-o /usr/bin/caddy ./cmd/caddy
+
+# Stage 2: Minimal runtime image
 FROM cgr.dev/chainguard/wolfi-base:latest
 
 RUN set -eux; \
-    apk add --no-cache \
-        ca-certificates \
-        curl \
-        libcap-utils \
-        mailcap; \
-    mkdir -p /config/caddy /data/caddy /etc/caddy /usr/share/caddy; \
-    chmod 1777 /config/caddy /data/caddy; \
-    curl -fsSL -o /etc/caddy/Caddyfile "https://github.com/caddyserver/dist/raw/33ae08ff08d168572df2956ed14fbc4949880d94/config/Caddyfile"; \
-    curl -fsSL -o /usr/share/caddy/index.html "https://github.com/caddyserver/dist/raw/33ae08ff08d168572df2956ed14fbc4949880d94/welcome/index.html"; \
-    apk del --no-network curl
+	apk add --no-cache \
+		ca-certificates \
+		curl \
+		libcap-utils \
+		mailcap; \
+	mkdir -p \
+		/config/caddy \
+		/data/caddy \
+		/etc/caddy \
+		/usr/share/caddy; \
+	chmod 1777 /config/caddy /data/caddy; \
+	curl -fsSL -o /etc/caddy/Caddyfile "https://github.com/caddyserver/dist/raw/33ae08ff08d168572df2956ed14fbc4949880d94/config/Caddyfile"; \
+	curl -fsSL -o /usr/share/caddy/index.html "https://github.com/caddyserver/dist/raw/33ae08ff08d168572df2956ed14fbc4949880d94/welcome/index.html"; \
+	apk del --no-network curl
 
 COPY --from=builder /usr/bin/caddy /usr/bin/caddy
 
-RUN setcap cap_net_bind_service=+p /usr/bin/caddy && \
-    chmod +x /usr/bin/caddy && \
-    apk del --no-network libcap-utils && \
-    caddy version
+# https://github.com/caddyserver/caddy/releases
+ENV CADDY_VERSION=v2.11.9
 
-ENV XDG_CONFIG_HOME=/config \
-    XDG_DATA_HOME=/data
+RUN set -eux; \
+	setcap cap_net_bind_service=+p /usr/bin/caddy; \
+	chmod +x /usr/bin/caddy; \
+	apk del --no-network libcap-utils; \
+	caddy version
 
-EXPOSE 80 443 443/udp 2019
+# See https://caddyserver.com/docs/conventions#file-locations for details
+ENV XDG_CONFIG_HOME=/config
+ENV XDG_DATA_HOME=/data
+
+LABEL org.opencontainers.image.version=v2.11.9
+LABEL org.opencontainers.image.title=Caddy
+LABEL org.opencontainers.image.description="a powerful, enterprise-ready, open source web server with automatic HTTPS written in Go"
+LABEL org.opencontainers.image.url=https://caddyserver.com
+LABEL org.opencontainers.image.documentation=https://caddyserver.com/docs
+LABEL org.opencontainers.image.vendor="Light Code Labs"
+LABEL org.opencontainers.image.licenses=Apache-2.0
+LABEL org.opencontainers.image.source="https://github.com/caddyserver/caddy-docker"
+
+EXPOSE 80
+EXPOSE 443
+EXPOSE 443/udp
+EXPOSE 2019
+
 WORKDIR /srv
+
 USER nonroot
 
 CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
