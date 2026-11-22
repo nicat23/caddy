@@ -17,7 +17,7 @@ Tags: {{ range $variant.tags }}
     {{- if $version.is_latest }}, {{ . }}{{ end }}
     {{- end }}
 
-{{- if has $variant "shared_tags" }}
+{{- if and (has $variant "shared_tags") $variant.shared_tags }}
 SharedTags: {{ range $i, $tag := $variant.shared_tags }}
     {{- if eq "latest" $tag }}
         {{- $version.caddy_version }}, {{ $minor }}

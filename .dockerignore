@@ -1,0 +1,14 @@
+.git
+.gitignore
+.dockerignore
+.copilot-session/
+.task
+*.md
+README*
+LICENSE
+Makefile
+docker-compose*.yml
+.github/
+*.tmpl
+stackbrew-config.yaml
+checksums.txt

@@ -11,7 +11,9 @@
 			{{- if eq "builder" $variant.dir -}}
 				{{ $template = "builder-dockerfile" -}}
 			{{ end -}}
-			{{- if strings.HasPrefix "windows-builder" $variant.dir -}}
+			{{- if strings.HasPrefix "wolfi" $variant.dir -}}
+				{{ $template = "wolfi-dockerfile" -}}
+			{{- else if strings.HasPrefix "windows-builder" $variant.dir -}}
 				{{ $template = "windows-builder-dockerfile" -}}
 			{{- else if strings.HasPrefix "windows-nanoserver" $variant.dir -}}
 				{{- $template = "nanoserver-dockerfile" -}}

@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - master
+      - build
   pull_request:
 
 jobs:
@@ -12,10 +13,12 @@ jobs:
       image: hairyhenderson/dockerfiles-builder:latest
     env:
       BASHBREW_LIBRARY: ./library
-      BASHBREW_NAMESPACE: caddy
+      BASHBREW_NAMESPACE: ${{ secrets.DOCKERHUB_USERNAME || 'nicat23' }}
       DOCKER_BUILDKIT: '1'
     steps:
       - uses: actions/checkout@master
+        with:
+          persist-credentials: false
       - name: non-master build test
         run: |
           docker build -f 2.11/alpine/Dockerfile 2.11/alpine
@@ -27,13 +30,14 @@ jobs:
         # NOTE: DOCKERHUB_TOKEN and DOCKERHUB_USERNAME must be present in https://github.com/caddyserver/caddy-docker/settings
         # the user must have permission to push to https://hub.docker.com/r/caddy/caddy
         run: |
-          echo ${{ secrets.DOCKERHUB_TOKEN }} | docker login --username ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
+          trap 'docker logout' EXIT
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login --username "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
           bashbrew push caddy
-        if: github.repository == 'caddyserver/caddy-docker' && github.ref == 'refs/heads/master'
+        if: github.repository == 'nicat23/caddy' && github.ref == 'refs/heads/build'
       - name: push (non-master dry run)
         run: |
           bashbrew push --dry-run caddy
-        if: github.repository != 'caddyserver/caddy-docker' || github.ref != 'refs/heads/master'
+        if: github.repository != 'nicat23/caddy' || github.ref != 'refs/heads/build'
 
   docker-windows-build:
     runs-on: windows-2022
@@ -42,6 +46,19 @@ jobs:
     #   BASHBREW_NAMESPACE: caddy
     steps:
       - uses: actions/checkout@master
+        with:
+          persist-credentials: false
+      - name: ensure docker is running
+        run: |
+          if ((Get-Service docker -ErrorAction SilentlyContinue).Status -ne 'Running') {
+            Start-Service docker
+          }
+          for ($i = 0; $i -lt 30; $i++) {
+            docker info *> $null
+            if ($LASTEXITCODE -eq 0) { break }
+            Start-Sleep -Seconds 2
+          }
+          docker info
       - name: non-master build test
         # the nanoserver image copies caddy.exe from the servercore image, which
         # isn't published yet when the version changes, so tag the local build
@@ -56,18 +73,25 @@ jobs:
         run: curl -o /bashbrew.exe https://doi-janky.infosiftr.net/job/bashbrew/job/master/lastSuccessfulBuild/artifact/bashbrew-windows-amd64.exe
       - name: build
         run: |
-          /bashbrew --arch windows-amd64 --constraint windowsservercore-ltsc2022 --namespace caddy --library ./library build caddy;
-          /bashbrew --arch windows-amd64 --constraint windowsnanoserver-ltsc2022 --namespace caddy --library ./library build caddy
+          /bashbrew --arch windows-amd64 --constraint windowsservercore-ltsc2022 --namespace ${{ secrets.DOCKERHUB_USERNAME || 'nicat23' }} --library ./library build caddy;
+          /bashbrew --arch windows-amd64 --constraint windowsnanoserver-ltsc2022 --namespace ${{ secrets.DOCKERHUB_USERNAME || 'nicat23' }} --library ./library build caddy
       - name: push
         # NOTE: DOCKERHUB_TOKEN and DOCKERHUB_USERNAME must be present in https://github.com/caddyserver/caddy-docker/settings
         # the user must have permission to push to https://hub.docker.com/r/caddy/caddy
         run: |
-          echo ${{ secrets.DOCKERHUB_TOKEN }} | docker login --username ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin;
-          /bashbrew --arch windows-amd64 --constraint windowsservercore-ltsc2022 --namespace caddy --library ./library push caddy;
-          /bashbrew --arch windows-amd64 --constraint windowsnanoserver-ltsc2022 --namespace caddy --library ./library push caddy
-        if: github.repository == 'caddyserver/caddy-docker' && github.ref == 'refs/heads/master'
+          try {
+            "${{ secrets.DOCKERHUB_TOKEN }}" | docker login --username "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            /bashbrew --arch windows-amd64 --constraint windowsservercore-ltsc2022 --namespace ${{ secrets.DOCKERHUB_USERNAME || 'nicat23' }} --library ./library push caddy
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            /bashbrew --arch windows-amd64 --constraint windowsnanoserver-ltsc2022 --namespace ${{ secrets.DOCKERHUB_USERNAME || 'nicat23' }} --library ./library push caddy
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          } finally {
+            docker logout
+          }
+        if: github.repository == 'nicat23/caddy' && github.ref == 'refs/heads/build'
       - name: push (non-master dry run)
         run: |
-          /bashbrew --arch windows-amd64 --constraint windowsservercore-ltsc2022 --namespace caddy --library ./library push --dry-run caddy;
-          /bashbrew --arch windows-amd64 --constraint windowsnanoserver-ltsc2022 --namespace caddy --library ./library push --dry-run caddy
-        if: github.repository != 'caddyserver/caddy-docker' || github.ref != 'refs/heads/master'
+          /bashbrew --arch windows-amd64 --constraint windowsservercore-ltsc2022 --namespace ${{ secrets.DOCKERHUB_USERNAME || 'nicat23' }} --library ./library push --dry-run caddy;
+          /bashbrew --arch windows-amd64 --constraint windowsnanoserver-ltsc2022 --namespace ${{ secrets.DOCKERHUB_USERNAME || 'nicat23' }} --library ./library push --dry-run caddy
+        if: github.repository != 'nicat23/caddy' || github.ref != 'refs/heads/build'
