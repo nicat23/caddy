@@ -1,6 +1,6 @@
 # this file is generated with gomplate:
 # template: https://github.com/caddyserver/caddy-docker/blob/e05f66898af9a0a694af637db2724f91d9d82ed7/stackbrew.tmpl
-# config context: https://github.com/caddyserver/caddy-docker/blob/d322e6686bbce5622d98a04c84fadd43b5eb8c58/stackbrew-config.yaml
+# config context: https://github.com/caddyserver/caddy-docker/blob/c2d7f9d2a9a2867db9cd69c8dd9b0d022294883b/stackbrew-config.yaml
 Maintainers: Dave Henderson (@hairyhenderson),
              Francis Lavoie (@francislavoie)
 
@@ -22,7 +22,7 @@ Tags: 2.11.9-wolfi, 2.11-wolfi, 2-wolfi, wolfi
 SharedTags: 
 GitRepo: https://github.com/caddyserver/caddy-docker.git
 Directory: 2.11/wolfi
-GitCommit: 
+GitCommit: c2d7f9d2a9a2867db9cd69c8dd9b0d022294883b
 Architectures: amd64, arm64v8
 
 Tags: 2.11.9-windowsservercore-ltsc2022, 2.11-windowsservercore-ltsc2022, 2-windowsservercore-ltsc2022, windowsservercore-ltsc2022

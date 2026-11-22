@@ -3,9 +3,8 @@ FROM cgr.dev/chainguard/wolfi-base:latest
 RUN apk add --no-cache \
 	ca-certificates \
 	curl \
-	libcap \
-	mailcap \
-	wget
+	libcap-utils \
+	mailcap
 
 RUN set -eux; \
 	mkdir -p \
@@ -15,8 +14,8 @@ RUN set -eux; \
 		/usr/share/caddy \
 	; \
 	chmod 1777 /config/caddy /data/caddy; \
-	wget -O /etc/caddy/Caddyfile "https://github.com/caddyserver/dist/raw/33ae08ff08d168572df2956ed14fbc4949880d94/config/Caddyfile"; \
-	wget -O /usr/share/caddy/index.html "https://github.com/caddyserver/dist/raw/33ae08ff08d168572df2956ed14fbc4949880d94/welcome/index.html"
+	curl -fsSL -o /etc/caddy/Caddyfile "https://github.com/caddyserver/dist/raw/33ae08ff08d168572df2956ed14fbc4949880d94/config/Caddyfile"; \
+	curl -fsSL -o /usr/share/caddy/index.html "https://github.com/caddyserver/dist/raw/33ae08ff08d168572df2956ed14fbc4949880d94/welcome/index.html"
 
 # https://github.com/caddyserver/caddy/releases
 ENV CADDY_VERSION=v2.11.9
@@ -33,10 +32,11 @@ RUN set -eux; \
 		s390x)   binArch='s390x'; checksum='213186130eeab27bc8fff06f4a6cffb253b36f719166c6cb12c539b4432186d6f7938847547a4e5cf47b1525424fdc74813950f08b928f788b7402127eb30e6b' ;; \
 		*) echo >&2 "error: unsupported architecture ($apkArch)"; exit 1 ;;\
 	esac; \
-	wget -O /tmp/caddy.tar.gz "https://github.com/caddyserver/caddy/releases/download/v2.11.9/caddy_2.11.9_linux_${binArch}.tar.gz"; \
+	curl -fsSL -o /tmp/caddy.tar.gz "https://github.com/caddyserver/caddy/releases/download/v2.11.9/caddy_2.11.9_linux_${binArch}.tar.gz"; \
 	echo "$checksum  /tmp/caddy.tar.gz" | sha512sum -c; \
 	tar x -z -f /tmp/caddy.tar.gz -C /usr/bin caddy; \
 	rm -f /tmp/caddy.tar.gz; \
+	setcap cap_net_bind_service=+p /usr/bin/caddy; \
 	chmod +x /usr/bin/caddy; \
 	caddy version
 
@@ -59,5 +59,7 @@ EXPOSE 443/udp
 EXPOSE 2019
 
 WORKDIR /srv
+
+USER nonroot
 
 CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
